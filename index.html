@@ -77,7 +77,66 @@ indentUnit:4,
 theme:"default"
 });
 
-async function initPython(){
+
+async function runCode(){
+    if(!pyodide){
+        output("Python engine is not ready.");
+        return;
+    }
+
+    if(running) return;
+
+    running = true;
+    stopped = false;
+
+    document.getElementById("terminal").textContent = "";
+    document.getElementById("status").textContent = "Running...";
+
+    const code = editor.getValue();
+
+    try {
+        try {
+            await pyodide.runPythonAsync(code);
+        } catch(error) {
+            const match = String(error).match(
+                /No module named ['"]([^'"]+)['"]/
+            );
+
+            if(!match) throw error;
+
+            const module = match[1];
+
+            output("[!] Installing " + module + "...");
+
+            try {
+                await pyodide.loadPackage(module);
+            } catch(packageError) {
+                await pyodide.loadPackage("micropip");
+
+                await pyodide.runPythonAsync(
+                    `import micropip
+await micropip.install("${module}")`
+                );
+            }
+
+            output("[+] " + module + " installed!");
+            output("[!] Restarting script...");
+
+            await pyodide.runPythonAsync(code);
+        }
+
+        document.getElementById("status").textContent =
+            "Execution completed.";
+
+    } catch(error) {
+        output("ERROR: " + error);
+        document.getElementById("status").textContent =
+            "Execution failed.";
+    }
+
+    running = false;
+}
+
 try{
 pyodide = await loadPyodide();
 pyodide.setStdout({batched:s=>output(s)});
