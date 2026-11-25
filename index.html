@@ -1,0 +1,150 @@
+
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Studio</title>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#10131d;color:#eee;font-family:Arial}
+header{padding:17px;background:#191f30;display:flex;justify-content:space-between;align-items:center}
+h2{margin:0;color:#8b9cff}
+button{border:0;border-radius:8px;padding:11px 15px;font-weight:bold;cursor:pointer}
+#run{background:#36c98b;color:#07150f}
+#stop{background:#e65b69;color:white}
+.toolbar{padding:12px;display:flex;gap:9px;flex-wrap:wrap}
+.editorbox{padding:10px}
+.CodeMirror{height:45vh;font-size:14px;border-radius:9px;background:#171c29;color:#eee}
+.CodeMirror-gutters{background:#171c29;border:0}
+.CodeMirror-linenumber{color:#78829a}
+.panel{margin:10px;background:#191f30;border-radius:10px;padding:12px}
+.panel h3{margin:0 0 10px;color:#8b9cff}
+#terminal{height:150px;overflow:auto;white-space:pre-wrap;color:#a7f3c5;font-family:monospace;font-size:13px}
+.status{padding:10px;color:#aab4c9;font-size:12px}
+input{background:#222b40;color:white;border:0;padding:10px;border-radius:8px}
+</style>
+</head>
+<body>
+<header>
+<h2>🐍 Python Studio</h2>
+<span id="engine">Duke ngarkuar...</span>
+</header>
+
+<div class="toolbar">
+<button id="run" onclick="runCode()">▶ RUN</button>
+<button id="stop" onclick="stopCode()">■ STOP</button>
+<button onclick="saveCode()">💾 SAVE</button>
+<button onclick="loadCode()">📂 OPEN</button>
+<button onclick="clearTerminal()">CLEAR</button>
+</div>
+
+<div class="editorbox">
+<textarea id="code">print("Hello from Python Studio!")
+
+name = "Emanuel"
+print("Welcome", name)
+
+for i in range(5):
+    print("Python Studio", i + 1)
+</textarea>
+</div>
+
+<div class="panel">
+<h3>Terminal / Output</h3>
+<div id="terminal">Python Studio terminal...</div>
+</div>
+
+<div class="status" id="status">Initializing Python Engine...</div>
+
+<input type="file" id="file" accept=".py,.txt" hidden>
+
+<script>
+let pyodide = null;
+let editor;
+let stopped = false;
+let running = false;
+
+editor = CodeMirror.fromTextArea(
+document.getElementById("code"), {
+mode:"python",
+lineNumbers:true,
+indentUnit:4,
+theme:"default"
+});
+
+async function initPython(){
+try{
+pyodide = await loadPyodide();
+pyodide.setStdout({batched:s=>output(s)});
+pyodide.setStderr({batched:s=>output(s)});
+document.getElementById("engine").textContent="Python Ready";
+document.getElementById("status").textContent="Python Engine is ready!";
+}catch(e){
+document.getElementById("engine").textContent="Engine Error";
+document.getElementById("status").textContent=String(e);
+}
+}
+
+function output(text){
+let terminal=document.getElementById("terminal");
+terminal.textContent+=text+"\n";
+terminal.scrollTop=terminal.scrollHeight;
+}
+
+async function runCode(){
+if(!pyodide){output("Python engine is not ready.");return}
+if(running)return;
+running=true;
+stopped=false;
+document.getElementById("terminal").textContent="";
+document.getElementById("status").textContent="Running...";
+try{
+await pyodide.runPythonAsync(editor.getValue());
+if(!stopped)document.getElementById("status").textContent="Execution completed.";
+}catch(e){
+output("ERROR: "+e);
+document.getElementById("status").textContent="Execution failed.";
+}
+running=false;
+}
+
+function stopCode(){
+stopped=true;
+output("STOP requested. A running Python task may need to finish.");
+}
+
+function clearTerminal(){
+document.getElementById("terminal").textContent="";
+}
+
+function saveCode(){
+let blob=new Blob([editor.getValue()],{type:"text/x-python"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="main.py";
+a.click();
+URL.revokeObjectURL(a.href);
+}
+
+function loadCode(){
+document.getElementById("file").click();
+}
+
+document.getElementById("file").addEventListener("change",e=>{
+let file=e.target.files[0];
+if(!file)return;
+let reader=new FileReader();
+reader.onload=()=>editor.setValue(reader.result);
+reader.readAsText(file);
+e.target.value="";
+});
+
+initPython();
+</script>
+</body>
+</html>
